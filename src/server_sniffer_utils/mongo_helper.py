@@ -1,7 +1,6 @@
 import datetime
 import re
-import datetime
-from typing import List
+from typing import List, Tuple
 
 from deepdiff import DeepDiff
 from pymongo import MongoClient
@@ -28,9 +27,11 @@ class MongoHelper:
         return self.db_handle.list_collection_names()
 
 
-    def find_document(self, collection_name: str, server_name: str):
+    def find_document(self, collection_name: str, server_name: str) -> Tuple[dict, datetime.date]:
         collection = self.db_handle[collection_name]
-        collection.find_one({'system_info.hostname': server_name.lower()}, projection={'_id': False})
+        doc = collection.find_one({'system_info.hostname': server_name.lower()}, projection={'_id': False})
+        self.__apply_projection(doc)
+        return doc
 
 
     def insert_documents(self, collection_name: str, documents: List[dict]) -> None:
@@ -63,34 +64,26 @@ class MongoHelper:
         system_info = server_info["system_info"]
         wildfly_info = server_info["wildfly_info"]
 
-        system_info.pop("date_time", None)
         system_info.pop("errors", None)
-
         wildfly_info.pop("errors", None)
 
         return
-
-
-    def extract_timestamps(self, server_info: dict) -> datetime:
-        date = server_info["system_info"]["date_time"]["date"]
-        year, month, day = [int(elem) for elem in date.split("-")]
-        time = server_info["system_info"]["date_time"]["time"]
-        hour, minute, second = [int(elem) for elem in time.split(":")]
-        return datetime(year, month, day, hour, minute, second)
 
     
     def __get_dict(self, ddiff: DeepDiff, entry_key: str, value_src: dict):
         ret = {}
 
-        for key in ddiff[entry_key]:
-            subkeys = key.replace("root", "").split("[")
-            subkeys = [subkey.replace("\'", "").replace("]", "") for subkey in subkeys if subkey]
+        if entry_key in ddiff:
 
-            entry = ret
-            value = value_src
-            for idx, subkey in enumerate(subkeys):
-                value = value[subkey]
-                entry[subkey] = entry.setdefault(subkey, {}) if idx < len(subkeys) - 1 else value
-                entry = entry[subkey]
+            for key in ddiff[entry_key]:
+                subkeys = key.replace("root", "").split("[")
+                subkeys = [subkey.replace("\'", "").replace("]", "") for subkey in subkeys if subkey]
+
+                entry = ret
+                value = value_src
+                for idx, subkey in enumerate(subkeys):
+                    value = value[subkey]
+                    entry[subkey] = entry.setdefault(subkey, {}) if idx < len(subkeys) - 1 else value
+                    entry = entry[subkey]
         
         return ret

@@ -58,7 +58,6 @@ class AnsibleGatherer:
         ret = {}
         
         keys = [
-            "ansible_date_time",
             "ansible_distribution", "ansible_distribution_release", "ansible_distribution_version",
             "ansible_architecture", "ansible_processor", "ansible_processor_cores", "ansible_processor_count",
             "ansible_processor_nproc", "ansible_processor_threads_per_core", "ansible_processor_vcpus",

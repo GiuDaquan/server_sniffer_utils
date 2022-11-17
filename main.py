@@ -1,8 +1,8 @@
 import datetime
+from multiprocessing import Pool
 
 import src.server_sniffer_utils.ansible_gatherer as ag
 import src.server_sniffer_utils.mongo_helper as mh
-from multiprocessing import Pool
 
 ROTATION = 30
 MONGO_HOST = "127.0.0.1"
