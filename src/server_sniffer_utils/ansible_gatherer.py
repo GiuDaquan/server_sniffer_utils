@@ -63,7 +63,7 @@ class AnsibleGatherer:
             "ansible_architecture", "ansible_processor", "ansible_processor_cores", "ansible_processor_count",
             "ansible_processor_nproc", "ansible_processor_threads_per_core", "ansible_processor_vcpus",
             "ansible_memory_mb",
-            "ansible_devices", "ansible_mounts",
+            "ansible_devices",
             "ansible_all_ipv4_addresses", "ansible_default_ipv4",
             "ansible_all_ipv6_addresses", "ansible_default_ipv6",
             "ansible_dns", "ansible_domain", "ansible_fqdn", "ansible_hostname",
@@ -76,6 +76,12 @@ class AnsibleGatherer:
         for key in keys:
             fixed_key = key.replace("ansible_", "")
             ret[fixed_key] = ansible_facts[key]
+
+        ret["mounts"] = {}
+        for mount in ansible_facts["ansible_mounts"]:
+            mount_point = mount["mount"]
+            mount.pop("mount")
+            ret["mounts"][mount_point] = mount
 
         ret["interfaces"] = {}
         for key in interfaces_keys:
@@ -124,6 +130,6 @@ class AnsibleGatherer:
             raise Exception(f"Failed to load valid JSON from: \n{out}")
 
         if "msg" in json_data:
-            raise Exception(f"Failed to execute ansible {module_name}: {json_data['msg']}" + err_string)
+            raise Exception(f"Failed to execute ansible module {module_name}: {json_data['msg']}" + err_string)
 
         return json_data

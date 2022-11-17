@@ -1,10 +1,10 @@
 import datetime
 import re
+import datetime
+from typing import List
 
 from deepdiff import DeepDiff
 from pymongo import MongoClient
-from pymongo.collection import Collection
-from datetime import datetime
 
 
 class MongoHelper:
@@ -13,15 +13,38 @@ class MongoHelper:
     def __init__(self, db_name: str, host:str, port: str, username: str="", password: str=""):
         self.client = MongoClient(host=host, port=int(port), username=username, password=password)
         self.db_handle = self.client[db_name]
+        self.DATE_FORMAT = "%Y-%m-%d"
 
     
-    def get_collection(self, collection: str) -> Collection:
-        return self.db_handle[collection]
+    def get_collection_name(self, date: datetime.datetime) -> str:
+        return date.strftime(self.DATE_FORMAT)
 
 
-    def find_document(self, collection: str, server_name: str):
-        db = self.db_handle[collection]
-        db.find_one({'system_info.hostname': server_name.lower()}, projection={'_id': False})
+    def get_collection_date(self, date: str) -> datetime.date:
+        return datetime.datetime.strptime(date, self.DATE_FORMAT).date()
+
+    
+    def get_collection_names(self) -> List[str]:
+        return self.db_handle.list_collection_names()
+
+
+    def find_document(self, collection_name: str, server_name: str):
+        collection = self.db_handle[collection_name]
+        collection.find_one({'system_info.hostname': server_name.lower()}, projection={'_id': False})
+
+
+    def insert_documents(self, collection_name: str, documents: List[dict]) -> None:
+        self.db_handle[collection_name].insert_many(documents)
+
+
+    def create_collection(self, collection_name: str) -> None:
+        self.db_handle.create_collection(collection_name)
+        return
+
+
+    def drop_collection(self, collection_name: str) -> None:
+        self.db_handle.drop_collection(collection_name)
+        return
 
 
     def get_ddiff(self, document_x: dict, document_y: dict) -> dict:
@@ -70,5 +93,4 @@ class MongoHelper:
                 entry[subkey] = entry.setdefault(subkey, {}) if idx < len(subkeys) - 1 else value
                 entry = entry[subkey]
         
-
         return ret

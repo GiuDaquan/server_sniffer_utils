@@ -1,46 +1,32 @@
-import json
-import src.server_sniffer_utils.ansible_gatherer as ans_gat
-import re
-import xml.etree.ElementTree as ET
-import os
-import subprocess
-from subprocess import PIPE
+import datetime
 
-def get_logrotate_info():
-    ret = {}
-    logrotate_conf_dir = "/etc/logrotate.d"
-    
-    if not os.path.isdir(logrotate_conf_dir):
-        raise Exception("Failed to read Logrotate Status")
+import src.server_sniffer_utils.ansible_gatherer as ag
+import src.server_sniffer_utils.mongo_helper as mh
+from multiprocessing import Pool
 
-    conf_regex = re.compile(r"({(.+)})", re.DOTALL)
+ROTATION = 30
+MONGO_HOST = "127.0.0.1"
+MONGO_PORT = 27017
+DB_NAME = "server_sniffer"
+NUM_WORKING_PROCS = 10
 
-    for file in os.listdir(logrotate_conf_dir):
-        cat_cmd = f"cat {os.path.join(logrotate_conf_dir, file)}"
-        cat_out = subprocess.run(cat_cmd, stdout=PIPE, shell=True).stdout.decode("utf-8", errors="replace")
+mongo_helper = mh.MongoHelper(DB_NAME, MONGO_HOST, MONGO_PORT)
 
-        conf = conf_regex.search(cat_out)
-        conf_blob = conf.group(1)
+collection_names = mongo_helper.get_collection_names()
+collection_dates = [mongo_helper.get_collection_date(col_name) for col_name in collection_names if col_name != DB_NAME]
+oldest_collection_date = min(collection_dates) if collection_dates else None
+today_date = datetime.date.today()
 
-        file_lines = cat_out.replace(conf_blob, "").splitlines()
-        file_lines = [line.strip() for line in file_lines if line and "#" not in line]
+if collection_dates and (today_date - oldest_collection_date).days > ROTATION:
+    mongo_helper.drop_collection(mongo_helper.get_collection_name(oldest_collection_date))
 
-        conf_lines = conf.group(2).splitlines()
-        conf_lines = [line.strip() for line in conf_lines if line]
+today_collection_name = mongo_helper.get_collection_name(datetime.date.today())
 
-        ret[file] = {}
-        ret[file]["log_files"] = file_lines
-        ret[file]["conf"] = conf_lines
+if (today_collection_name not in collection_names):
+    mongo_helper.create_collection(today_collection_name)
+    ansible_gatherer = ag.AnsibleGatherer('/home/giuseppe-daquanno/Desktop/inventory.yaml')
 
-    return ret
+    with Pool(NUM_WORKING_PROCS) as p:
+        docs = p.map(ansible_gatherer.gather_server_info, ansible_gatherer.get_server_names())
 
-get_logrotate_info()
-
-
-ansible_gatherer = ans_gat.AnsibleGatherer('/home/giuseppe-daquanno/Desktop/inventory.yaml')
-servers = ansible_gatherer.get_server_names()
-server_info = ansible_gatherer.gather_server_info(servers[0])
-
-with open(f'{servers[0]}_info.json', 'w+') as server_info_file:
-    print(json.dumps(server_info, indent=4))
-    json.dump(server_info, server_info_file)
+    mongo_helper.insert_documents(today_collection_name, docs)
