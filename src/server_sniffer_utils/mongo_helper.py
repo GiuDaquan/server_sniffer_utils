@@ -12,10 +12,13 @@ class MongoHelper:
     def __init__(self, db_name: str, host:str, port: str, username: str="", password: str=""):
         self.client = MongoClient(host=host, port=int(port), username=username, password=password)
         self.db_handle = self.client.get_database(db_name)
-        self.db_handle.create_collection(db_name)
         self.DATE_FORMAT = "%Y-%m-%d"
+        try:
+            self.db_handle.create_collection(db_name)
+        except Exception:
+            pass
+        
 
-    
     def get_collection_name(self, date: datetime.datetime) -> str:
         return date.strftime(self.DATE_FORMAT)
 
