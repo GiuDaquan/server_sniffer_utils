@@ -11,7 +11,8 @@ class MongoHelper:
 
     def __init__(self, db_name: str, host:str, port: str, username: str="", password: str=""):
         self.client = MongoClient(host=host, port=int(port), username=username, password=password)
-        self.db_handle = self.client[db_name]
+        self.db_handle = self.client.get_database(db_name)
+        self.db_handle.create_collection(db_name)
         self.DATE_FORMAT = "%Y-%m-%d"
 
     
@@ -27,7 +28,7 @@ class MongoHelper:
         return self.db_handle.list_collection_names()
 
 
-    def find_document(self, collection_name: str, server_name: str) -> Tuple[dict, datetime.date]:
+    def find_document(self, collection_name: str, server_name: str) -> dict:
         collection = self.db_handle[collection_name]
         doc = collection.find_one({'system_info.hostname': server_name.lower()}, projection={'_id': False})
         self.__apply_projection(doc)
@@ -40,12 +41,10 @@ class MongoHelper:
 
     def create_collection(self, collection_name: str) -> None:
         self.db_handle.create_collection(collection_name)
-        return
 
 
     def drop_collection(self, collection_name: str) -> None:
         self.db_handle.drop_collection(collection_name)
-        return
 
 
     def get_ddiff(self, document_x: dict, document_y: dict) -> dict:
@@ -67,10 +66,8 @@ class MongoHelper:
         system_info.pop("errors", None)
         wildfly_info.pop("errors", None)
 
-        return
-
     
-    def __get_dict(self, ddiff: DeepDiff, entry_key: str, value_src: dict):
+    def __get_dict(self, ddiff: DeepDiff, entry_key: str, value_src: dict) -> dict:
         ret = {}
 
         if entry_key in ddiff:
