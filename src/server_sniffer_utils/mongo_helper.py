@@ -1,6 +1,5 @@
 import datetime
-import re
-from typing import List, Tuple
+from typing import List
 
 from deepdiff import DeepDiff
 from pymongo import MongoClient
@@ -29,6 +28,11 @@ class MongoHelper:
     
     def get_collection_names(self) -> List[str]:
         return self.db_handle.list_collection_names()
+
+
+    def get_documents(self, collection_name: str) -> list[dict]:
+        collection = self.db_handle[collection_name]
+        return list(collection.find({}))
 
 
     def find_document(self, collection_name: str, server_name: str) -> dict:
