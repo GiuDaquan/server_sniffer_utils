@@ -32,7 +32,8 @@ class MongoHelper:
 
     def get_documents(self, collection_name: str) -> list[dict]:
         collection = self.db_handle[collection_name]
-        return list(collection.find({}))
+        documents = list(collection.find({}, {"system_info.hostname": 1}))
+        return [document["system_info"]["hostname"].upper() for document in documents]
 
 
     def find_document(self, collection_name: str, server_name: str) -> dict:
