@@ -161,3 +161,4 @@ cython_debug/
 
 # Test output
 *_info.json
+main.py

@@ -78,6 +78,7 @@ import re
 import shutil
 import subprocess
 import xml.etree.ElementTree as ET
+import zipfile
 from asyncio.subprocess import PIPE
 from typing import Callable, Dict, List, Pattern, Tuple, Union
 from xml.etree.ElementTree import Element
@@ -85,6 +86,8 @@ from xml.etree.ElementTree import Element
 from ansible.module_utils.basic import AnsibleModule
 
 SERVICE_CONF_DIR = "/etc/systemd/system/"
+WILDFLY_CONF_PATH = "/usr/local/wildfly/standalone/configuration/standalone.xml"
+WILDFLY_CONTENT_PATH = "/usr/local/wildfly/standalone/data/content"
 WORK_DIR = "/tmp/server_sniffer/"
 ORG_DIR = "/homes/36346daquanno/org"
 
@@ -109,6 +112,8 @@ def run_module() -> None:
 
     wildfly_info = result["wildfly_info"]
     wildfly_info["errors"] = []
+
+    env_file_path = None
         
     # read wildfly service configuration file
     try:
@@ -116,33 +121,29 @@ def run_module() -> None:
         env_file_path = wildfly_info["service_conf"]["environment_file"]
     except Exception as e:
         wildfly_info["service_conf"] = None
-        module.fail_json(msg=str(e), **result)
+        wildfly_info["errors"].append(f"service_conf: {str(e)}")
 
     # read wildfly environment file
     try:
         wildfly_info["env_file"] = get_environment_file_info(env_file_path)
-        wildfly_mode = wildfly_info["env_file"]["mode"]
-        wildfly_config = wildfly_info["env_file"]["config"]
     except Exception as e:
         wildfly_info["env_file"] = None
-        module.fail_json(msg=str(e), **result)
+        wildfly_info["errors"].append(f"env_file: {str(e)}")
 
-    wildfly_conf_path = f"/usr/local/wildfly/{wildfly_mode}/configuration/{wildfly_config}"
-    wildfly_content_path = f"/usr/local/wildfly/{wildfly_mode}/data/content"
+    # read org file
+    try:
+        wildfly_info["org"] = get_org_info()
+    except Exception as e:
+        wildfly_info["errors"].append(f"org: {str(e)}")
 
-    cat_cmd = f"cat {wildfly_conf_path}"
+    cat_cmd = f"cat {WILDFLY_CONF_PATH}"
     cat_out = subprocess.run(cat_cmd, stdout=PIPE, shell=True).stdout.decode("utf-8", errors="replace")
 
     # read wildfly configuration file
     wildfly_info["users"] = get_users_info(cat_out)
     wildfly_info["datasources"] = get_datasources_info(cat_out)
     wildfly_info["log_files"] = get_logs_info(cat_out)
-    wildfly_info["deployments"] = get_deployments_info(cat_out, wildfly_content_path)
-
-    try:
-        wildfly_info["org"] = get_org_info()
-    except Exception as e:
-        wildfly_info["errors"].append(str(e))
+    wildfly_info["deployments"] = get_deployments_info(cat_out, WILDFLY_CONTENT_PATH)
 
     module.exit_json(**result)
 
@@ -156,7 +157,7 @@ def main():
 # ----------------------------------------------------------------------------------------------------------------------
 def get_service_conf_info() -> Dict:
     if len(glob.glob(SERVICE_CONF_DIR + "wildfly*.service")) != 1:
-        raise Exception(f"Failed to read service configuration file at {SERVICE_CONF_DIR}")
+        raise Exception(f"No configuration file at {SERVICE_CONF_DIR}")
 
     ret = {}
     cat_cmd = f"cat {SERVICE_CONF_DIR}" + "wildfly*.service"    
@@ -179,7 +180,7 @@ def get_service_conf_info() -> Dict:
 
 def get_environment_file_info(env_file_path: str) -> Dict:
     if not os.path.isfile(env_file_path):
-        raise Exception(f"Failed to read environment configuration file {env_file_path}")
+        raise Exception(f"No environment configuration file at {env_file_path}")
 
     ret = {}
     cat_cmd = f"cat {env_file_path}"
@@ -190,7 +191,7 @@ def get_environment_file_info(env_file_path: str) -> Dict:
         ret["mode"] = re.search(r"WILDFLY_MODE=(.*)", cat_out).group(1)
         ret["bind"] = re.search(r"WILDFLY_BIND=(.*)", cat_out).group(1)
     except:
-        raise Exception(f"Failed to read environment configuration file {env_file_path}")
+        raise Exception(f"Failed to read environment configuration file at{env_file_path}")
 
     return ret
 #/----------------------------------------------------------------------------------------------------------------------
@@ -315,8 +316,10 @@ def extract_deployment_data(ear_file_path: str, runtime_name: str, deployment_ha
     if os.path.exists(WORK_DIR):
         shutil.rmtree(WORK_DIR)
     os.makedirs(WORK_DIR)
+
+    with zipfile.ZipFile(ear_file_path) as archive_file:
+        archive_file.extractall(WORK_DIR)
     
-    subprocess.run(f"unzip {ear_file_path} -d {WORK_DIR}", stdout=PIPE, shell=True)
     archives_extensions = ["war", "jar"]
     extract_archives(archives_extensions)
 
@@ -463,7 +466,8 @@ def extract_archives(archive_extensions: List[str]) -> None:
             if not os.path.exists(sub_dir_name):
                 os.makedirs(sub_dir_name)
 
-            subprocess.run(f"unzip {archive} -d {sub_dir_name}", stdout=PIPE, shell=True)
+            with zipfile.ZipFile(archive) as archive_file:
+                archive_file.extractall(sub_dir_name)
 
     return
 
