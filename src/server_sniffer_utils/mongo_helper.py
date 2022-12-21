@@ -31,17 +31,23 @@ class MongoHelper:
 
 
     def get_documents(self, collection_name: str) -> list[dict]:
-        collection = self.db_handle[collection_name]
-        documents = list(collection.find({}, {"system_info.hostname": 1}))
-        return [document["system_info"]["hostname"].upper() for document in documents]
+        try:
+            collection = self.db_handle[collection_name]
+            documents = list(collection.find({}, {"system_info.hostname": 1}))
+            return [document["system_info"]["hostname"].upper() for document in documents]
+        except:
+            return []
 
 
     def find_document(self, collection_name: str, server_name: str) -> dict:
-        collection = self.db_handle[collection_name]
-        doc = collection.find_one({'system_info.hostname': server_name.lower()}, projection={'_id': False})
-        self.__apply_projection(doc)
-        return doc
-
+        try:
+            collection = self.db_handle[collection_name]
+            doc = collection.find_one({'system_info.hostname': server_name.lower()}, projection={'_id': False})
+            self.__apply_projection(doc)
+            return doc
+        except:
+            return None
+        
 
     def insert_documents(self, collection_name: str, documents: List[dict]) -> None:
         self.db_handle[collection_name].insert_many(documents)
