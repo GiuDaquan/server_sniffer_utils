@@ -88,6 +88,7 @@ from ansible.module_utils.basic import AnsibleModule
 SERVICE_CONF_DIR = "/etc/systemd/system/"
 WILDFLY_CONF_PATH = "/usr/local/wildfly/standalone/configuration/standalone.xml"
 WILDFLY_CONTENT_PATH = "/usr/local/wildfly/standalone/data/content"
+LOCAL_DIR = "/usr/local"
 WORK_DIR = "/tmp/server_sniffer/"
 ORG_DIR = "/homes/36346daquanno/org"
 
@@ -136,10 +137,15 @@ def run_module() -> None:
     except Exception as e:
         wildfly_info["errors"].append(f"org: {str(e)}")
 
+    # get wildfly_version
+    version_regex = re.compile(r"wildfly-([0-9]+.[0-9]+.[0-9]+)")
+    subdirs = " ".join(os.listdir(LOCAL_DIR))
+    wildfly_info["version"] = version_regex.search(subdirs).group(1)
+
+    # read wildfly configuration file
     cat_cmd = f"cat {WILDFLY_CONF_PATH}"
     cat_out = subprocess.run(cat_cmd, stdout=PIPE, shell=True).stdout.decode("utf-8", errors="replace")
 
-    # read wildfly configuration file
     wildfly_info["users"] = get_users_info(cat_out)
     wildfly_info["datasources"] = get_datasources_info(cat_out)
     wildfly_info["log_files"] = get_logs_info(cat_out)
