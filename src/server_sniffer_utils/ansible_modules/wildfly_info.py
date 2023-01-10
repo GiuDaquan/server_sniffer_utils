@@ -209,7 +209,7 @@ def get_environment_file_info(env_file_path: str) -> Dict:
 # Wildfly configuration file data extraction
 #/----------------------------------------------------------------------------------------------------------------------
 def get_users_info(wildfly_conf_file: str) -> Dict:
-    ret = {}
+    ret = []
 
     root = ET.fromstring(wildfly_conf_file)
     ns_list = find_ns(root)
@@ -218,22 +218,25 @@ def get_users_info(wildfly_conf_file: str) -> Dict:
     roles = root.findall(xpath)
 
     for role in roles:
-        role_name = role.get("name")
-        ret[role_name] = {}
-        ret[role_name]["users"] = []
-        ret[role_name]["groups"] = []
+        entry = {}
+
+        entry["role_name"] = role.get("name")
+        entry["users"] = []
+        entry["groups"] = []
                 
         for elem in role.find(f"{root_ns}include"):
             if f"{root_ns}user" == elem.tag:
-                ret[role_name]["users"].append(elem.get("name"))
+                entry["users"].append(elem.get("name"))
             elif f"{root_ns}group" == elem.tag:
-                ret[role_name]["groups"].append(elem.get("name"))
+                entry["groups"].append(elem.get("name"))
+        
+        ret.append(entry)
 
     return ret
 
 
 def get_datasources_info(wildfly_conf_file: str) -> Dict:
-    ret = {}
+    ret = []
     
     root = ET.fromstring(wildfly_conf_file)
     ns_list = find_ns(root, ["profile", "subsystem"], ["", "datasources"])
@@ -243,20 +246,23 @@ def get_datasources_info(wildfly_conf_file: str) -> Dict:
     datasources = root.findall(xpath)
 
     for datasource in datasources:
-        jndi_name = datasource.get("jndi-name")
-        ret[jndi_name] = {}
-        ret[jndi_name]["pool_name"] = datasource.get("pool-name")
-        ret[jndi_name]["connection_url"] = datasource.findtext(f"{ds_ns}connection-url")
-        ret[jndi_name]["driver"] = datasource.findtext(f"{ds_ns}driver")
+        entry = {}
+        
+        entry["jndi_name"] = datasource.get("jndi-name")
+        entry["pool_name"] = datasource.get("pool-name")
+        entry["connection_url"] = datasource.findtext(f"{ds_ns}connection-url")
+        entry["driver"] = datasource.findtext(f"{ds_ns}driver")
 
         security = datasource.find(f"{ds_ns}security")
-        ret[jndi_name]["username"] = security.findtext(f"{ds_ns}user-name") if security else None
+        entry["username"] = security.findtext(f"{ds_ns}user-name") if security else None
+
+        ret.append(entry)
     
     return ret
 
 
 def get_logs_info(wildfly_conf_file: str) -> Dict:
-    ret = {}
+    ret = []
 
     root = ET.fromstring(wildfly_conf_file)
     ns_list = find_ns(root, ["profile", "subsystem"], ["", "logging"])
@@ -268,18 +274,21 @@ def get_logs_info(wildfly_conf_file: str) -> Dict:
     for handler in handlers:
         file = handler.find(f"{log_ns}file")
         if file is not None:
-            file_name = file.get("path")
-            ret[file_name] = {}
-            ret[file_name]["path"] = file.get("relative-to")
+            entry = {}
+
+            entry["file_name"] = file.get("path")
+            entry["path"] = file.get("relative-to")
 
             rotation = handler.find(f"{log_ns}rotate-size")
-            ret[file_name]["rotation"] = rotation.get("value") if rotation is not None else None
+            entry["rotation"] = rotation.get("value") if rotation is not None else None
+
+            ret.append(entry)
 
     return ret
 
 
 def get_deployments_info(wildfly_conf_file: str, wildfly_content_path: str) -> Dict:
-    ret = {}
+    ret = []
     hashes = {}
 
     root = ET.fromstring(wildfly_conf_file)
@@ -303,9 +312,9 @@ def get_deployments_info(wildfly_conf_file: str, wildfly_content_path: str) -> D
             assembled_hash = hash_prefix + hash_remainder
             deployment_name = hashes[assembled_hash]["deployment_name"]
             runtime_name = hashes[assembled_hash]["runtime_name"]
-            deployment_entry = extract_deployment_data(dep_file_path, runtime_name, assembled_hash)
+            deployment_entry = extract_deployment_data(dep_file_path, deployment_name, runtime_name, assembled_hash)
 
-            ret[deployment_name] = deployment_entry
+            ret.append(deployment_entry)
     
     return ret
 #/----------------------------------------------------------------------------------------------------------------------
@@ -316,7 +325,7 @@ def get_deployments_info(wildfly_conf_file: str, wildfly_content_path: str) -> D
 # ----------------------------------------------------------------------------------------------------------------------
 # Wildlfy deployment data extraction
 # ----------------------------------------------------------------------------------------------------------------------
-def extract_deployment_data(ear_file_path: str, runtime_name: str, deployment_hash: str) -> Dict:
+def extract_deployment_data(ear_file_path: str, deploment_name:str, runtime_name: str, deployment_hash: str) -> Dict:
     ret = {}
 
     if os.path.exists(WORK_DIR):
@@ -341,6 +350,7 @@ def extract_deployment_data(ear_file_path: str, runtime_name: str, deployment_ha
     ret["log_file"] = read_archive_file("log4j.xml", get_deployemnt_log_file_info)
     ret["roles"] = read_archive_file("web.xml", get_deployment_roles_info)
 
+    ret["deploment_name"] = deploment_name
     ret["runtime_name"] = runtime_name
     ret["sha1"] = deployment_hash
 
@@ -355,14 +365,19 @@ def get_deployment_structure_info(raw_file: str) -> Dict:
     modules = root.findall(xpath)
 
     ret["self"] = [module.get("name") for module in modules]
+    ret["sub_modules"] = []
 
     xpath = f"./sub-deployment"
     submodules = root.findall(xpath)
 
     for submodule in submodules:
-        module_name = submodule.get("name")
+        entry = {}
+
+        entry["module_name"] = submodule.get("name")
         modules = submodule.findall("./dependencies/module")
-        ret[module_name]= [module.get("name") for module in modules]
+        entry["dependencies"] = [module.get("name") for module in modules]
+
+        ret["sub_modules"].append(entry)
 
     return ret
 

@@ -93,9 +93,9 @@ def run_module():
 
     # get system information
     try:
-        system_info["logrotate_conf"] = get_logrotate_info()
+        system_info["logrotate_configuration"] = get_logrotate_info()
     except Exception as e:
-        system_info["logrotate_conf"] = None
+        system_info["logrotate_configuration"] = None
         system_info["errors"].append(f"logrotate_conf: {str(e)}")
 
     try:
@@ -113,7 +113,7 @@ def main():
 
 
 def get_logrotate_info():
-    ret = {}
+    ret = []
     logrotate_conf_dir = "/etc/logrotate.d"
     
     if not os.path.isdir(logrotate_conf_dir):
@@ -134,15 +134,18 @@ def get_logrotate_info():
         conf_lines = conf.group(2).splitlines()
         conf_lines = [line.strip().replace("\t", "") for line in conf_lines if line and "#" not in line]
 
-        ret[file] = {}
-        ret[file]["log_files"] = file_lines
-        ret[file]["conf"] = conf_lines
+        entry = {}
+        entry["file_name"] = file
+        entry["log_files"] = file_lines
+        entry["configuration"] = conf_lines
+
+        ret.append(entry)
 
     return ret
 
 
 def get_pkg_list():
-    ret = {}
+    ret = []
     yum_cmd = "yum list installed"
     yum_out = subprocess.run(yum_cmd, stdout=subprocess.PIPE, shell=True).stdout.decode("utf-8", errors="replace")
 
@@ -156,9 +159,13 @@ def get_pkg_list():
 
     for line in lines[pkg_index:]:
         pkg_name, pkg_version, pkg_owner = [word for word in line.split(" ") if word]
-        ret[pkg_name] = {}
-        ret[pkg_name]["version"] = pkg_version
-        ret[pkg_name]["repo"] = pkg_owner
+        
+        entry = {}
+        entry["pkg_name"] = pkg_name
+        entry["version"] = pkg_version
+        entry["repository"] = pkg_owner
+
+        ret.append(entry)
 
     return ret if ret else None
 
