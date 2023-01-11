@@ -63,6 +63,7 @@ class AnsibleGatherer:
             "ansible_processor_nproc", "ansible_processor_threads_per_core", "ansible_processor_vcpus",
             "ansible_memory_mb",
             "ansible_devices",
+            "ansible_mounts",
             "ansible_all_ipv4_addresses", "ansible_default_ipv4",
             "ansible_all_ipv6_addresses", "ansible_default_ipv6",
             "ansible_dns", "ansible_domain", "ansible_fqdn", "ansible_hostname",
