@@ -68,24 +68,18 @@ class AnsibleGatherer:
             "ansible_dns", "ansible_domain", "ansible_fqdn", "ansible_hostname",
         ]
 
-        interfaces_keys = []
-        for interface_name in ansible_facts["ansible_interfaces"]:
-            interfaces_keys.append(f"ansible_{interface_name}")
-
         for key in keys:
             fixed_key = key.replace("ansible_", "")
             ret[fixed_key] = ansible_facts[key]
 
-        ret["mounts"] = {}
-        for mount in ansible_facts["ansible_mounts"]:
-            mount_point = mount["mount"]
-            mount.pop("mount")
-            ret["mounts"][mount_point] = mount
+        interfaces_keys = []
+        for interface_name in ansible_facts["ansible_interfaces"]:
+            interfaces_keys.append(f"ansible_{interface_name}")
 
-        ret["interfaces"] = {}
+        ret["interfaces"] = []
         for key in interfaces_keys:
-            fixed_key = key.replace("ansible_", "")
-            ret["interfaces"][fixed_key] = ansible_facts[key]
+            entry = ansible_facts[key]
+            ret["interfaces"].append(entry)
 
         return ret
 
